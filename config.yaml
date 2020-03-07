@@ -1,0 +1,32 @@
+music: false
+colored: true
+team-size: 2
+team-num: 2
+pokemon:
+  hp:
+    min: 100
+    max: 120
+  power:
+    min: 15
+    max: 25
+  critical-chance:
+    min: 0
+    max: 0.2
+  critical-multiplier:
+    min: 1.5
+    max: 2
+  accuracy:
+    min: 0.8
+    max: 1.0
+  damage-deviation: 0.15
+arena:
+  hp-multiplier:
+    min: 5
+    max: 10
+  power-multiplier:
+    min: 8
+    max: 12
+  double-hit-chance:
+    min: 0
+    max: 0.6
+  
