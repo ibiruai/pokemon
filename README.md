@@ -1,3 +1,3 @@
 Генератор случайных схваток.
 
-Знакомлюсь с Python и с классами на трансляциях <https://www.twitch.tv/icefire708>
+Знакомлюсь с Python и классами на трансляциях <https://www.twitch.tv/icefire708>
