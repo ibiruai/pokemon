@@ -1,7 +1,7 @@
 import os, random, time, msvcrt, yaml
 
-stream = open('config.yaml', 'r')
-data = yaml.safe_load(stream)
+stream = open('config.yaml', 'r', encoding="utf8")
+data = yaml.full_load(stream)
 PLAY_MUSIC = data['music']
 PRINT_COLORED = data['colored']
 
@@ -13,28 +13,32 @@ if PRINT_COLORED:
 	Style = colorama.Style
 	Fore  = colorama.Fore
 	Back  = colorama.Back
-	team_colors = [Style.BRIGHT + Fore.YELLOW, Style.BRIGHT + Fore.GREEN]
+	team_colors = [f'{Style.BRIGHT}{Fore.YELLOW}', f'{Style.BRIGHT}{Fore.GREEN}', f'{Style.BRIGHT}{Fore.MAGENTA}', f'{Style.BRIGHT}{Fore.CYAN}', f'{Fore.RED}', f'{Style.BRIGHT}{Fore.BLUE}', f'{Style.DIM}{Fore.CYAN}', f'{Style.DIM}{Fore.YELLOW}', f'{Style.DIM}{Fore.GREEN}', f'{Style.DIM}{Fore.MAGENTA}']
 
 os.system('title Битва покемонов')
-pokemon_names = ['Пикачу', 'Иви', 'Сильвеон', 'Бульбазавр', 'Амбреон', 'Райчу', 'Пичу', 'Чаризард', 'Мьюту', 'Эспеон', 'Сквиртл', 'Деденне', 'Шеймин', 'Лифеон', 'Хупа', 'Ивельтал', 'Чармандер', 'Грениндзя', 'Зубат', 'Парас']
 teams = []
 team_size = data['team-size']
 team_num = data['team-num']
-max_team_size = pokemon_names.__len__() // 2
+names = data['names']
+team_names = data['team-names']
+max_team_size = names.__len__() // team_num
 
 def print_color(string):
 	if not PRINT_COLORED:
 		print(string)
 		return
+
 	def is_number(string):
 		try:
 			float(string)
 			return True
 		except ValueError:
 			return False
-	for team_id in range(0, team_num):
-		for fighter in teams[team_id].fighters:
-			string = string.replace(fighter.name, team_colors[team_id] + fighter.name + Style.RESET_ALL)
+
+	for team in teams:
+		string = string.replace(team.name, team_colors[team.id] + team.name + Style.RESET_ALL)
+		for fighter in team.fighters:
+			string = string.replace(fighter.name, team_colors[team.id] + fighter.name + Style.RESET_ALL)
 	for word in string.split():
 		word = word.replace(",", "")
 		if is_number(word) or is_number(word.replace("%", "")):
@@ -43,16 +47,17 @@ def print_color(string):
 			string = string.replace(word, Style.BRIGHT + Fore.RED + word + Style.RESET_ALL)
 	print(string)
 
-class Pokemon():
+class Fighter():
 	def __init__(self, name):
 		self.name = name
-		self.HP = random.randint(data['pokemon']['hp']['min'], data['pokemon']['hp']['max'])
-		self.power = random.randint(data['pokemon']['power']['min'], data['pokemon']['power']['max'])
-		self.critical_chance = random.uniform(data['pokemon']['critical-chance']['min'], data['pokemon']['critical-chance']['max'])
-		self.critical_multiplier = random.uniform(data['pokemon']['critical-multiplier']['min'], data['pokemon']['critical-multiplier']['max'])
-		self.accuracy = random.uniform(data['pokemon']['accuracy']['min'], data['pokemon']['accuracy']['max'])
-		self.damage_deviation = data['pokemon']['damage-deviation']
-		self.is_able_to_fight = True
+		self.HP = random.randint(data['fighter']['hp']['min'], data['fighter']['hp']['max'])
+		self.power = random.randint(data['fighter']['power']['min'], data['fighter']['power']['max'])
+		self.critical_chance = random.uniform(data['fighter']['critical-chance']['min'], data['fighter']['critical-chance']['max'])
+		self.critical_multiplier = random.uniform(data['fighter']['critical-multiplier']['min'], data['fighter']['critical-multiplier']['max'])
+		self.accuracy = random.uniform(data['fighter']['accuracy']['min'], data['fighter']['accuracy']['max'])
+		self.damage_deviation = data['fighter']['damage-deviation']
+		self.alive = True
+		self.ready = True
 
 	def greeting(self):
 		print_color(random.choice([
@@ -83,44 +88,54 @@ class Pokemon():
 			print_color(f'{self.name} бьёт {target.name} на {damage_info}, и здоровье {target.name} становится {target.HP}.')
 
 	def is_alive(self):
-		return self.HP > 0
+		if self.alive and self.HP == 0:
+			self.alive = False
+			print_color(random.choice([
+				f'{self.name} больше не может сражаться.',
+				f'{self.name} теряет волю к сражению.',
+				f'{self.name} покидает арену.']))
+		return self.alive
 
 class Team():
-	def __init__(self, size, fighters):
-		self.size = size
+	def __init__(self, name, id, fighters):
+		self.name = name
+		self.id = id
 		self.fighters = fighters
-
-	def is_alive(self):
-		res = False
-		for fighter in self.fighters:
-			res += fighter.is_able_to_fight
-		return res
+		self.alive = True
 
 	def attack(self, target, double_hit_chance):
 		for fighter in self.fighters:
-			if fighter.is_able_to_fight:
+			if fighter.alive and fighter.ready:
 				x = 0
-				for i in range(target.size - 1, -1, -1):
-					if target.fighters[i].is_alive():
+				for i in range(team_size - 1, -1, -1):
+					if target.fighters[i].HP > 0:
 						x = i
 				fighter.attack(target.fighters[x])
 				if (random.uniform(0, 1) <= double_hit_chance):
-					print(f'{fighter.name} бьёт дважды за раунд.')
+					print_color(f'{fighter.name} бьёт дважды за раунд.')
 					x = 0
-					for i in range(target.size - 1, -1, -1):
-						if target.fighters[i].is_alive():
+					for i in range(team_size - 1, -1, -1):
+						if target.fighters[i].HP > 0:
 							x = i
 					fighter.attack(target.fighters[x])
+				fighter.ready = False
 
-	def check_fighters(self):
+	def is_alive(self):
+		if self.alive:
+			self.alive = False
+			for fighter in self.fighters:
+				self.alive += fighter.is_alive()
+			if not self.alive and team_size > 1:
+				print_color(f'{self.name} терпит поражение')
+		return self.alive
+
+	def team_points(self):
+		points = 0
 		for fighter in self.fighters:
-			f = fighter.is_able_to_fight
-			fighter.is_able_to_fight = fighter.is_alive()
-			if f != fighter.is_able_to_fight:
-				print(random.choice([
-					f'{fighter.name} больше не может сражаться.',
-					f'{fighter.name} теряет волю к сражению.',
-					f'{fighter.name} покидает арену.']))
+			if fighter.HP > 0:
+				points += fighter.HP
+				points += fighter.power * 3
+		return points
 
 def header(string, ch):
 	a = 60 - string.__len__() - 2
@@ -138,13 +153,13 @@ class Arena():
 
 	def greetings(self):
 		header('Добро пожаловать на Арену!', '=')
-		print(f'Условия боя: HP участников изменены в {self.HP_multiplier} раз(а), а сила атаки - в {self.power_multiplier} раз(а).\nУчастники могут ударить дважды за раунд с вероятностью {round(self.double_hit_chance * 100)}%.')
-		for i in range(0, team_num):
-			if self.teams[0].size == 1:
-				header('Поприветствуем участников', '=')
-			else:
-				header(['Первая', 'Вторая', 'Третяя', 'Четвёртая', 'Пятая', 'Шестая', 'Седьмая', 'Восьмая', 'Девятая', 'Десятая'][i] +' команда', '=')
-			for fighter in self.teams[i].fighters:
+		print_color(f'Условия боя: HP участников изменены в {self.HP_multiplier} раз(а), а сила атаки - в {self.power_multiplier} раз(а).\nУчастники могут ударить дважды за раунд с вероятностью {round(self.double_hit_chance * 100)}%.\nПравила боя: Схватка продолжается, пока в строю не останется одна сторона.')
+		if team_size == 1:
+			header('Поприветствуем участников', '=')
+		for team in self.teams:
+			if team_size > 1:
+				header(team.name, '=')
+			for fighter in team.fighters:
 				fighter.HP *= self.HP_multiplier
 				fighter.power *= self.power_multiplier
 				fighter.greeting()
@@ -153,18 +168,21 @@ class Arena():
 	def battle(self):
 		header('Бой', '=')
 		round_num = 1
-		teams_alive = self.teams_alive()
-		while len(teams_alive) > 1:
+		while self.teams_alive() > 1:
 			header(f'{round_num} раунд', '-')
 			round_num += 1
-			#teams_
-			#for j in (0, len(teams_alive)):
-				#i = teams_alive
-			self.teams[0].attack(self.teams[1], self.double_hit_chance)
-			self.teams[1].attack(self.teams[0], self.double_hit_chance)
-			self.teams[0].check_fighters()
-			self.teams[1].check_fighters()
-			teams_alive = self.teams_alive()
+			for team in self.teams:
+				if team.alive:
+					for fighter in team.fighters:
+						fighter.ready = True
+					t = 0
+					for team2 in self.teams:
+						if team.id != team2.id:
+							team_points = team2.team_points()
+							if team_points > t:
+								t = team_points
+								target = team2
+					team.attack(target, self.double_hit_chance)
 
 	def results(self):
 		header('Подведение результатов', '=')
@@ -172,7 +190,7 @@ class Arena():
 			print(f'Битва заканчивается ничьёй!')
 		else:
 			winner = self.teams[self.winner]
-			if winner.size == 1:
+			if team_size == 1:
 				string = random.choice([
 					'Побеждает ',
 					'Одерживает верх ',
@@ -184,21 +202,21 @@ class Arena():
 					'Одерживают верх ',
 					'Забирают победу ',
 					'Победители: '])
-			for i in range(0, winner.fighters.__len__()):
+			for i in range(team_size):
 				string += winner.fighters[i].name
-				if i == winner.size - 2:
+				if i == team_size - 2:
 					string += ' и '
-				elif i <= winner.size - 2:
+				elif i <= team_size - 2:
 					string += ', '
-			print_color(f'{string}!')
+			print_color(string + '!')
 
 	def teams_alive(self):
 		self.winner = -1
-		teams_alive = []
-		for i in range(0, team_num):
-			if self.teams[i].is_alive():
-				teams_alive.append(i)
-				self.winner = i
+		teams_alive = 0
+		for team in self.teams:
+			if team.is_alive():
+				teams_alive = teams_alive + 1
+				self.winner = team.id
 		return teams_alive
 
 class Music():
@@ -218,33 +236,26 @@ class Music():
 				self.music_is_playing = True
 
 def random_fight(team_size):
-	os.system('cls')
+	os.system(['clear','cls'][os.name == 'nt'])
 	global teams
 	teams = []
-	names = pokemon_names.copy()
-	for team_id in range(0, team_num):
-		pokemons = []
-		for i in range(0, team_size):
-			pokemons.append(Pokemon(random.choice(names)))
-			names.remove(pokemons[i].name)
-		teams.append(Team(team_size, pokemons))
+	available_names = names.copy()
+	for team_id in range(team_num):
+		fighters = []
+		for i in range(team_size):
+			fighters.append(Fighter(random.choice(available_names)))
+			available_names.remove(fighters[i].name)
+		teams.append(Team(team_names[team_id], team_id, fighters))
 	arena = Arena(teams)
 	arena.greetings()
 	arena.battle()
 	arena.results()
-	if PRINT_COLORED:
-		button_begin = f'{Back.WHITE}{Fore.BLACK} '
-		button_end = f' {Style.RESET_ALL}'
-	else:
-		button_begin = '#'
-		button_end = '#'
-	if PLAY_MUSIC:
-		print(f'{button_begin}Enter{button_end} Новый бой {button_begin}S{button_end} Размер команды {button_begin}M{button_end} Музыка {button_begin}Esc{button_end} Выход')
-	else:
-		print(f'{button_begin}Enter{button_end} Новый бой {button_begin}S{button_end} Размер команды {button_begin}Esc{button_end} Выход')
+	b1 = f'{Back.WHITE}{Fore.BLACK} ' if PRINT_COLORED else '#'
+	b2 = f' {Style.RESET_ALL}' if PRINT_COLORED else '#'
+	print(f'{b1}Enter{b2} Новый бой {b1}S{b2} Размер команды ' + ['', f'{b1}M{b2} Музыка '][PLAY_MUSIC] + f'{b1}Esc{b2} Выход')
 
 if PLAY_MUSIC:
-	music = Music('pokemon.mp3')
+	music = Music(data['music-name'])
 random_fight(team_size)
 
 while True:
