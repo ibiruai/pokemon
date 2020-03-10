@@ -1,4 +1,4 @@
-import os, random, time, msvcrt, yaml
+import os, random, time, msvcrt, yaml, requests
 
 stream = open('config.yaml', 'r', encoding="utf8")
 data = yaml.full_load(stream)
@@ -15,11 +15,20 @@ if PRINT_COLORED:
 	Back  = colorama.Back
 	team_colors = [f'{Style.BRIGHT}{Fore.YELLOW}', f'{Style.BRIGHT}{Fore.GREEN}', f'{Style.BRIGHT}{Fore.MAGENTA}', f'{Style.BRIGHT}{Fore.CYAN}', f'{Fore.RED}', f'{Style.BRIGHT}{Fore.BLUE}', f'{Style.DIM}{Fore.CYAN}', f'{Style.DIM}{Fore.YELLOW}', f'{Style.DIM}{Fore.GREEN}', f'{Style.DIM}{Fore.MAGENTA}']
 
-os.system('title Битва покемонов')
 teams = []
 team_size = data['team-size']
 team_num = data['team-num']
-names = data['names']
+twitch = data['twitch']
+if twitch:
+	response = requests.get(f'https://tmi.twitch.tv/group/user/{twitch}/chatters')
+	names = response.json()["chatters"]["viewers"]
+	os.system('title Битва зрителей')
+	viewers_battle = True
+if not twitch or len(names) < team_size * team_num:
+	os.system('title Битва покемонов')
+	names = data['names']
+	viewers_battle = False
+
 team_names = data['team-names']
 max_team_size = names.__len__() // team_num
 
@@ -41,7 +50,8 @@ def print_color(string):
 			string = string.replace(fighter.name, team_colors[team.id] + fighter.name + Style.RESET_ALL)
 	for word in string.split():
 		word = word.replace(",", "")
-		if is_number(word) or is_number(word.replace("%", "")):
+		word = word.replace(".", "")
+		if is_number(word) or is_number(word.replace("%", "")) or word == f'@{twitch}':
 			string = string.replace(word, Style.BRIGHT + word + Style.RESET_ALL)
 		elif is_number(word.replace("!", "")):
 			string = string.replace(word, Style.BRIGHT + Fore.RED + word + Style.RESET_ALL)
@@ -126,7 +136,7 @@ class Team():
 			for fighter in self.fighters:
 				self.alive += fighter.is_alive()
 			if not self.alive and team_size > 1:
-				print_color(f'{self.name} терпит поражение')
+				print_color(f'{self.name} терпит поражение.')
 		return self.alive
 
 	def team_points(self):
@@ -153,6 +163,7 @@ class Arena():
 
 	def greetings(self):
 		header('Добро пожаловать на Арену!', '=')
+		print_color(f'Сегодня на арене зрители @{twitch}.' if viewers_battle else 'Сегодня на арене покемоны.')
 		print_color(f'Условия боя: HP участников изменены в {self.HP_multiplier} раз(а), а сила атаки - в {self.power_multiplier} раз(а).\nУчастники могут ударить дважды за раунд с вероятностью {round(self.double_hit_chance * 100)}%.\nПравила боя: Схватка продолжается, пока в строю не останется одна сторона.')
 		if team_size == 1:
 			header('Поприветствуем участников', '=')
